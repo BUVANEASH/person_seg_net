@@ -4,14 +4,14 @@ import tensorflow as tf
 def conv_block(inputs, conv_type, kernel, kernel_size, strides, padding='same', relu=True):
     '''Custom function for conv2d --> conv_block'''
     if(conv_type == 'ds'):
-    x = tf.keras.layers.SeparableConv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)
+        x = tf.keras.layers.SeparableConv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)
     else:
-    x = tf.keras.layers.Conv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)  
+        x = tf.keras.layers.Conv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)  
 
     x = tf.keras.layers.BatchNormalization()(x)
 
     if (relu):
-    x = tf.keras.activations.relu(x)
+        x = tf.keras.activations.relu(x)
 
     return x
 
@@ -47,9 +47,9 @@ def pyramid_pooling_block(input_tensor, bin_sizes):
     h = 32
 
     for bin_size in bin_sizes:
-    x = tf.keras.layers.AveragePooling2D(pool_size=(w//bin_size, h//bin_size), strides=(w//bin_size, h//bin_size))(input_tensor)
-    x = tf.keras.layers.Conv2D(128, 3, 2, padding='same')(x)
-    x = tf.keras.layers.Lambda(lambda x: tf.image.resize_images(x, (w,h)))(x)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(w//bin_size, h//bin_size), strides=(w//bin_size, h//bin_size))(input_tensor)
+        x = tf.keras.layers.Conv2D(128, 3, 2, padding='same')(x)
+        x = tf.keras.layers.Lambda(lambda x: tf.image.resize_images(x, (w,h)))(x)
 
     concat_list.append(x)
 

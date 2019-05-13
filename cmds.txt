@@ -1,0 +1,19 @@
+tflite_convert \
+--graph_def_file=/media/new_hdd2/seg_net/results/Models/Models/seg_net.pb \
+--output_file=/media/new_hdd2/seg_net/results/Models/Models/seg_net.lite \
+--input_format=TENSORFLOW_GRAPHDEF \
+--output_format=TFLITE \
+--input_shape=1,768,768,3 \
+--input_array=data \
+--output_array=sigmoid/Sigmoid \
+--inference_type=FLOAT \
+--input_data_type=FLOAT
+
+
+python3 keras_to_tf.py --input_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5 \
+--output_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768_quantized.pb \
+--quantize=True
+
+tflite_convert \
+  --output_file=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768_quantized.tflite \
+  --keras_model_file=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5
