@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 #/usr/bin/python3
 import tensorflow as tf
+import keras
+from keras import backend as K
+
 
 # save model to pb ====================
 def freeze_session(session, keep_var_names=None, output_names=None, clear_devices=True):
@@ -20,7 +23,6 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
     Returns:
         The frozen graph definition.
     """
-    from tensorflow.python.framework.graph_util import convert_variables_to_constants
     graph = session.graph
     with graph.as_default():
         freeze_var_names = list(set(v.op.name for v in tf.global_variables()).difference(keep_var_names or []))
@@ -30,8 +32,8 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
         if clear_devices:
             for node in input_graph_def.node:
                 node.device = ""
-        frozen_graph = convert_variables_to_constants(session, input_graph_def,
-                                                      output_names, freeze_var_names)
+        frozen_graph = tf.compat.v1.graph_util.convert_variables_to_constants(session, input_graph_def,
+                                                                              output_names, freeze_var_names)
         return frozen_graph
 
 def get_size(model_dir, model_file='saved_model.pb'):
@@ -45,3 +47,28 @@ def get_size(model_dir, model_file='saved_model.pb'):
     print('Model size: {} KB'.format(round(pb_size/(1024.0),3)))
     print('Variables size: {} KB'.format(round( variables_size/(1024.0),3)))
     print('Total Size: {} KB'.format(round((pb_size + variables_size)/(1024.0),3)))
+
+def freeze_keras(sess, model, quantize=True):
+    
+    output_node_names = [node.op.name for node in model.outputs]
+    input_node_names = [node.op.name for node in model.inputs]
+
+    graphDef = sess.graph.as_graph_def()
+
+    if quantize:
+        from tensorflow.tools.graph_transforms import TransformGraph
+        transforms = ["quantize_weights", "quantize_nodes"]
+        transformed_graph_def = TransformGraph(graphDef, [],
+                                               output_node_names,
+                                               transforms)
+        constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(
+            sess,
+            transformed_graph_def,
+            output_node_names)
+    else:
+        constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(
+            sess,
+            graphDef,
+            output_node_names)
+
+    return constant_graph
