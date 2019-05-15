@@ -39,14 +39,16 @@ def bottleneck_block(inputs, filters, kernel, t, strides, n):
         x = _res_bottleneck(x, filters, kernel, t, 1, True)
     return x
 
-def pyramid_pooling_block(input_tensor, bin_sizes, image_size):
+def pyramid_pooling_block(input_tensor, bin_sizes):
     '''Pyramid pooling block Method'''
+
+    b,w,h,c = tf.keras.backend.int_shape(input_tensor)
     concat_list = [input_tensor]
 
     for bin_size in bin_sizes:
-        x = tf.keras.layers.AveragePooling2D(pool_size=(image_size[0]//bin_size, image_size[1]//bin_size), strides=(image_size[0]//bin_size, image_size[1]//bin_size))(input_tensor)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(w//bin_size, h//bin_size), strides=(w//bin_size, h//bin_size))(input_tensor)
         x = tf.keras.layers.Conv2D(128, 3, 2, padding='same')(x)
-        x = tf.keras.layers.Lambda(lambda x: tf.image.resize_images(x, (image_size[0],image_size[1])))(x)
+        x = tf.keras.layers.Lambda(lambda x: tf.image.resize_images(x, (w,h)))(x)
 
     concat_list.append(x)
 
@@ -77,7 +79,7 @@ def fast_scnn(pretrained = None, input_shape = (2048, 1024, 3), num_classes = 19
     gfe_layer = bottleneck_block(lds_layer, 64, (3, 3), t=6, strides=2, n=3)
     gfe_layer = bottleneck_block(gfe_layer, 96, (3, 3), t=6, strides=2, n=3)
     gfe_layer = bottleneck_block(gfe_layer, 128, (3, 3), t=6, strides=1, n=3)
-    gfe_layer = pyramid_pooling_block(gfe_layer, [2,4,6,8], (input_shape[0]//32,input_shape[1]//32))
+    gfe_layer = pyramid_pooling_block(gfe_layer, [2,4,6,8])
 
     """## Step 3: Feature Fusion"""
 

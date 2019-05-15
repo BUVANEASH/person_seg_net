@@ -102,7 +102,7 @@ def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True,
         new_mask = np.zeros(mask.shape + (num_class,))
         for i in range(num_class):
             new_mask[mask == i,i] = 1       
-        new_mask = new_mask.astype(np.uint8)  
+        new_mask = new_mask.astype(np.float32)  
     else:
         if binary:
             new_mask = mask
