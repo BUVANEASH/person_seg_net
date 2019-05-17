@@ -1,0 +1,9 @@
+tensorflow>=1.13.1
+keras
+skimage
+numpy
+segmentation_models
+pillow
+coremltools
+matplotlib
+opencv-python
