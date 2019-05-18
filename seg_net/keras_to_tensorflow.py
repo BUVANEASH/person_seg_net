@@ -3,7 +3,7 @@
 import tensorflow as tf
 import keras
 from keras import backend as K
-
+from tensorflow.tools.graph_transforms import TransformGraph
 
 # save model to pb ====================
 def freeze_session(session, keep_var_names=None, output_names=None, clear_devices=True):
@@ -36,9 +36,10 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
                                                                               output_names, freeze_var_names)
         return frozen_graph
 
-def freeze_keras(sess, input_node_names, output_node_names, quantize=False, clear_devices = True):
-    
-    output_node_names += [v.op.name for v in tf.global_variables()]
+def freeze_keras(sess, input_node_names, output_node_names, optimize = False, quantize=False, clear_devices = True, add_tf_global = False):
+
+    if add_tf_global:
+        output_node_names += [v.op.name for v in tf.global_variables()]
 
     graphDef = sess.graph.as_graph_def()
 
@@ -46,20 +47,29 @@ def freeze_keras(sess, input_node_names, output_node_names, quantize=False, clea
         for node in graphDef.node:
             node.device = ""
 
-    if quantize:
-        from tensorflow.tools.graph_transforms import TransformGraph
-        transforms = ["quantize_weights", "quantize_nodes"]
-        transformed_graph_def = TransformGraph(graphDef, [],
+    if optimize:
+        transforms = [
+                         "remove_nodes(op=Identity)", 
+                         "merge_duplicate_nodes",
+                         "strip_unused_nodes",
+                         "fold_constants(ignore_errors=true)",
+                         "fold_batch_norms",
+                         "fold_old_batch_norms",
+                         "sort_by_execution_order"
+                        ]
+        graphDef = TransformGraph(graphDef, [],
                                                output_node_names,
                                                transforms)
-        constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(
-            sess,
-            transformed_graph_def,
-            output_node_names)
-    else:
-        constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(
-            sess,
-            graphDef,
-            output_node_names)
+
+    if quantize:
+        transforms = ["quantize_weights", "quantize_nodes"]
+        graphDef = TransformGraph(graphDef, [],
+                                               output_node_names,
+                                               transforms)
+
+    constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(
+                                                                            sess,
+                                                                            graphDef,
+                                                                            output_node_names)
 
     return constant_graph

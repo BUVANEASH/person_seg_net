@@ -34,6 +34,34 @@ toco \
 --post_training_quantize \
 --allow_custom_ops
 
+bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
+--in_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
+--out_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_opt.pb \
+--inputs='input_1' \
+--outputs='sigmoid/Sigmoid' \
+--transforms='
+  strip_unused_nodes
+  remove_nodes(op=Identity, op=CheckNumerics)
+  fold_constants(ignore_errors=true)
+  fold_batch_norms
+  
+
+
+bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
+--in_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
+--out_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_Qopt.pb \
+--inputs='input_1' \
+--outputs='sigmoid/Sigmoid' \
+--transforms='
+  add_default_attributes
+  strip_unused_nodes
+  remove_nodes(op=Identity, op=CheckNumerics)
+  fold_constants(ignore_errors=true)
+  fold_batch_norms
+  quantize_weights
+  quantize_nodes
+  strip_unused_nodes
+  sort_by_execution_order'
 
 python3 keras_to_tf.py --input_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5 \
 --output_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768_quantized.pb \

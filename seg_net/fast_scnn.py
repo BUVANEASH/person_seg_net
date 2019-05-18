@@ -1,6 +1,5 @@
-import keras
-import keras.backend as K
 import tensorflow as tf
+import tensorflow.keras.backend as K
 # 1,259,685
 
 def _make_divisible(v, divisor, min_value=None):
@@ -16,15 +15,15 @@ def conv_block(inputs, conv_type, kernel, kernel_size, strides, padding='same', 
     '''Custom function for conv2d --> conv_block'''
     
     if(conv_type == 'ds'):
-        x = keras.layers.SeparableConv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)
+        x = tf.keras.layers.SeparableConv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)
     else:
-        x = keras.layers.Conv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)  
+        x = tf.keras.layers.Conv2D(kernel, kernel_size, padding=padding, strides = strides)(inputs)  
 
     if batchnorm:
-        x = keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.BatchNormalization()(x)
 
     if relu:
-        x = keras.layers.Activation('relu')(x)
+        x = tf.keras.layers.Activation('relu')(x)
 
     return x
 
@@ -37,14 +36,14 @@ def _res_bottleneck(inputs, filters, kernel, t, strides, residue=False):
     x = inputs
 
     x = conv_block(x, 'conv', tchannel, (1, 1), strides=(1, 1), relu=False)
-    x = keras.layers.ReLU(6.0)(x)
-    x = keras.layers.DepthwiseConv2D(kernel, strides=strides, depth_multiplier=1, padding='same')(x)    
-    x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.ReLU(6.0)(x)
+    x = tf.keras.layers.ReLU(6.0)(x)
+    x = tf.keras.layers.DepthwiseConv2D(kernel, strides=strides, depth_multiplier=1, padding='same')(x)    
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU(6.0)(x)
     x = conv_block(x, 'conv', pointwise_filters, (1, 1), strides=(1, 1), padding='same', relu=False)
 
     if residue and in_channels == pointwise_filters and strides == (1,1) :
-        x = keras.layers.add([x, inputs])
+        x = tf.keras.layers.add([x, inputs])
     
     return x
 
@@ -58,16 +57,16 @@ def bottleneck_block(inputs, filters, kernel, t, strides, n):
 def pyramid_pooling_block(input_tensor, bin_sizes):
     '''Pyramid pooling block Method'''
 
-    b,w,h,c = keras.backend.int_shape(input_tensor)
+    b,w,h,c = tf.keras.backend.int_shape(input_tensor)
     concat_list = [input_tensor]
 
     for bin_size in bin_sizes:
-        x = keras.layers.AveragePooling2D(pool_size=(w//bin_size, h//bin_size), strides=(w//bin_size, h//bin_size))(input_tensor)
+        x = tf.keras.layers.AveragePooling2D(pool_size=(w//bin_size, h//bin_size), strides=(w//bin_size, h//bin_size))(input_tensor)
         x = conv_block(x, 'conv', 128, (1, 1), strides=(1, 1), relu=True)
-        x = keras.layers.Lambda(lambda x: K.tf.image.resize_images(x, (w,h)))(x)
+        x = tf.keras.layers.Lambda(lambda x: tf.image.resize_images(x, (w,h)))(x)
         concat_list.append(x)
 
-    return keras.layers.Concatenate()(concat_list)
+    return tf.keras.layers.Concatenate()(concat_list)
 
 def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19, activation = 'softmax', dropout_rate = 0.3):
     '''
@@ -80,11 +79,11 @@ def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19
         activation (str): Last layer activation function.
 
     Returns:
-        tf Keras Model of fast_scnn.
+        Keras Model of fast_scnn.
     '''
     
     # Input Layer
-    input_layer = keras.layers.Input(shape = input_shape, name = 'input_layer')
+    input_layer = tf.keras.layers.Input(shape = input_shape, name = 'input_layer')
 
     lds_layer = conv_block(input_layer, 'conv', 32, (3, 3), strides = (2, 2))
     lds_layer = conv_block(lds_layer, 'ds', 48, (3, 3), strides = (2, 2))
@@ -100,15 +99,15 @@ def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19
 
     ff_layer1 = conv_block(lds_layer, 'conv', 128, (1, 1), padding = 'same', strides = (1, 1), relu=False)
 
-    ff_layer2 = keras.layers.UpSampling2D((4, 4))(gfe_layer)
-    ff_layer2 = keras.layers.DepthwiseConv2D((3,3), strides=(1, 1), depth_multiplier=1, padding='same')(ff_layer2)
-    ff_layer2 = keras.layers.BatchNormalization()(ff_layer2)
-    ff_layer2 = keras.layers.Activation('relu')(ff_layer2)
-    ff_layer2 = keras.layers.Conv2D(128, 1, strides = (1, 1), padding='same', activation=None)(ff_layer2)
+    ff_layer2 = tf.keras.layers.UpSampling2D((4, 4))(gfe_layer)
+    ff_layer2 = tf.keras.layers.DepthwiseConv2D((3,3), strides=(1, 1), depth_multiplier=1, padding='same')(ff_layer2)
+    ff_layer2 = tf.keras.layers.BatchNormalization()(ff_layer2)
+    ff_layer2 = tf.keras.layers.Activation('relu')(ff_layer2)
+    ff_layer2 = tf.keras.layers.Conv2D(128, 1, strides = (1, 1), padding='same', activation=None)(ff_layer2)
 
-    ff_final = keras.layers.add([ff_layer1, ff_layer2])
-    ff_final = keras.layers.BatchNormalization()(ff_final)
-    ff_final = keras.layers.Activation('relu')(ff_final)
+    ff_final = tf.keras.layers.add([ff_layer1, ff_layer2])
+    ff_final = tf.keras.layers.BatchNormalization()(ff_final)
+    ff_final = tf.keras.layers.Activation('relu')(ff_final)
 
     """## Step 4: Classifier"""
     classifier =  conv_block(ff_final, 'ds', 128, (3, 3), strides = (1, 1), relu=True, batchnorm = True)
@@ -116,13 +115,13 @@ def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19
 
     classifier = conv_block(classifier, 'conv', num_classes, (1, 1), strides=(1, 1), padding='same', relu=True, batchnorm = True)
     if dropout_rate:
-        classifier = keras.layers.Dropout( rate = dropout_rate )(classifier)
-    classifier = keras.layers.UpSampling2D((8, 8))(classifier)
-    classifier = keras.layers.Activation(activation, name = 'output_layer')(classifier)
+        classifier = tf.keras.layers.Dropout( rate = dropout_rate )(classifier)
+    classifier = tf.keras.layers.UpSampling2D((8, 8))(classifier)
+    classifier = tf.keras.layers.Activation(activation, name = 'output_layer')(classifier)
 
     """## Model Compilation"""
 
-    fast_scnn = keras.Model(inputs = input_layer , outputs = classifier, name = 'Fast_SCNN')
+    fast_scnn = tf.keras.Model(inputs = input_layer , outputs = classifier, name = 'Fast_SCNN')
     
     if pretrained:
         fast_scnn.load_weights(pretrained)
