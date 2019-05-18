@@ -1,13 +1,38 @@
 tflite_convert \
---graph_def_file=/media/new_hdd2/seg_net/results/Models/Models/seg_net.pb \
---output_file=/media/new_hdd2/seg_net/results/Models/Models/seg_net.lite \
---input_format=TENSORFLOW_GRAPHDEF \
+--output_file=sample_tf.tflite \
+--graph_def_file=mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_op.pb \
 --output_format=TFLITE \
---input_shape=1,768,768,3 \
---input_array=data \
---output_array=sigmoid/Sigmoid \
 --inference_type=FLOAT \
---input_data_type=FLOAT
+--inference_input_type=FLOAT \
+--input_arrays=input_1 \
+--input_shapes=1,512,512,3 \
+--output_arrays=sigmoid/Sigmoid \
+--post_training_quantize \
+--allow_custom_ops
+
+tflite_convert \
+--output_file=sample_tf.tflite \
+--graph_def_file=fast_scnn_BCE_ACC_IOU_1_sigmoid_768.pb \
+--output_format=TFLITE \
+--inference_type=FLOAT \
+--inference_input_type=FLOAT \
+--input_arrays='input_layer' \
+--input_shapes=1,768,768,3 \
+--output_arrays='output_layer/Sigmoid' \
+--post_training_quantize \
+--allow_custom_ops
+
+toco \
+--output_file=sample.tflite \
+--graph_def_file=mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
+--output_format=TFLITE \
+--inference_type=FLOAT \
+--inference_input_type=FLOAT \
+--input_arrays=input_1 \
+--input_shapes=1,512,512,3 \
+--output_arrays=sigmoid/Sigmoid \
+--post_training_quantize \
+--allow_custom_ops
 
 
 python3 keras_to_tf.py --input_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5 \

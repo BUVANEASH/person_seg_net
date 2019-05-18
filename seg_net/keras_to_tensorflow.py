@@ -36,24 +36,15 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
                                                                               output_names, freeze_var_names)
         return frozen_graph
 
-def get_size(model_dir, model_file='saved_model.pb'):
-    model_file_path = os.path.join(model_dir, model_file)
-    print(model_file_path, '')
-    pb_size = os.path.getsize(model_file_path)
-    variables_size = 0
-    if os.path.exists(os.path.join(model_dir,'variables/variables.data-00000-of-00001')):
-        variables_size = os.path.getsize(os.path.join(model_dir,'variables/variables.data-00000-of-00001'))
-        variables_size += os.path.getsize(os.path.join(model_dir,'variables/variables.index'))
-    print('Model size: {} KB'.format(round(pb_size/(1024.0),3)))
-    print('Variables size: {} KB'.format(round( variables_size/(1024.0),3)))
-    print('Total Size: {} KB'.format(round((pb_size + variables_size)/(1024.0),3)))
-
-def freeze_keras(sess, model, quantize=True):
+def freeze_keras(sess, input_node_names, output_node_names, quantize=False, clear_devices = True):
     
-    output_node_names = [node.op.name for node in model.outputs]
-    input_node_names = [node.op.name for node in model.inputs]
+    output_node_names += [v.op.name for v in tf.global_variables()]
 
     graphDef = sess.graph.as_graph_def()
+
+    if clear_devices:
+        for node in graphDef.node:
+            node.device = ""
 
     if quantize:
         from tensorflow.tools.graph_transforms import TransformGraph
