@@ -34,6 +34,18 @@ toco \
 --post_training_quantize \
 --allow_custom_ops
 
+toco \
+--output_file=sample.tflite \
+--keras_model_file=mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.hdf5 \
+--output_format=TFLITE \
+--inference_type=FLOAT \
+--inference_input_type=FLOAT \
+--input_arrays=input_1 \
+--input_shapes=1,512,512,3 \
+--output_arrays=sigmoid/Sigmoid \
+--post_training_quantize \
+--allow_custom_ops
+
 bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
 --in_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
 --out_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_opt.pb \

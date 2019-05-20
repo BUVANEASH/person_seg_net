@@ -76,7 +76,7 @@ def preprocess_input(img, imgNorm="sub_mean"):
         img = img/255.0
     return img
         
-def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True,num_class=2):
+def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True, alpha = True, num_class=2):
     '''
     Adjusts Image and Annotation before feeding to model training.
 
@@ -89,6 +89,7 @@ def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True,
             - "divide"
         binary (bool): Binary Class or Not.
         multiclass (bool): Multiclass or Not.
+        alpha (bool): To have two class layers for background (1-mask) and foreground (mask).
         num_class (int): Number of classes.
 
     Returns:
@@ -96,26 +97,33 @@ def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True,
     '''
     
     img = preprocess_input(img,imgNorm)
+    dnum = len(mask.shape)
+
+    if binary:
+        mask[mask>0] = 1
     
-    if multiclass:           
-        mask = mask[:,:,:,0] if(len(mask.shape) == 4) else mask[:,:,0]
+    if multiclass:        
+        mask = mask[:,:,:,0] if (dnum == 4) else mask[:,:,0]
         new_mask = np.zeros(mask.shape + (num_class,))
-        for i in range(num_class):
-            new_mask[mask == i,i] = 1       
-        new_mask = new_mask.astype(np.float32)  
+        if alpha and (num_class == 2):            
+            if (dnum == 4):
+                new_mask[:,:,:,0] = (1 - mask) # Background
+                new_mask[:,:,:,1] = mask # Foreground
+            else:
+                new_mask[:,:,0] = (1 - mask) # Background
+                new_mask[:,:,1] = mask # Foreground
+        else:      
+            for i in range(num_class):
+                new_mask[mask == i,i] = 1       
+            new_mask = new_mask.astype(np.float32)  
     else:
-        if binary:
-            new_mask = mask
-            new_mask[mask>0] = 1
-            new_mask = new_mask.astype(np.float32)
-        else:
-            new_mask = np.array( mask / 255.0 ,dtype=np.float32)
+        new_mask = np.array( mask / np.max(mask) ,dtype=np.float32)
     
     return (img,new_mask)
 
 def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict,image_color_mode = "rgb",
                     mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
-                    imgNorm="sub_mean" , binary = False, multiclass = True, num_class=2, save_to_dir = None, 
+                    imgNorm="sub_mean" , binary = False, multiclass = True, num_class=2, alpha =True, save_to_dir = None, 
                    target_size = (240,240),seed = 1):
     '''
     Generates Train image and mask pairs.
@@ -171,12 +179,12 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict,image
         seed = seed)
     train_generator = zip(image_generator, mask_generator)
     for (img,mask) in train_generator:
-        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, num_class)
+        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, alpha, num_class)
         yield (img,mask)
 
 def validationGenerator(batch_size,train_path,image_folder,mask_folder,image_color_mode = "rgb",
                     mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
-                    imgNorm="sub_mean" , binary = False, multiclass = True, num_class=2, save_to_dir = None,
+                    imgNorm="sub_mean" , binary = False, multiclass = True, num_class=2, alpha =True, save_to_dir = None,
                     target_size = (240,240),seed = 1):
     '''
     Generates Validation image and mask pairs.
@@ -232,7 +240,7 @@ def validationGenerator(batch_size,train_path,image_folder,mask_folder,image_col
         seed = seed)
     train_generator = zip(image_generator, mask_generator)
     for (img,mask) in train_generator:
-        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, num_class)
+        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, alpha, num_class)
         yield (img,mask)
 
 def testGenerator(test_path,target_size = (256,256),as_gray = False):

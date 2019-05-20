@@ -124,7 +124,7 @@ def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19
     fast_scnn = tf.keras.Model(inputs = input_layer , outputs = classifier, name = 'Fast_SCNN')
     
     if pretrained:
-        fast_scnn.load_weights(pretrained)
+        fast_scnn.load_weights(pretrained, by_name=True)
     
     return fast_scnn
     
