@@ -329,10 +329,10 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
                          '`xception`  or `mobilenetv2` ')
 
     if input_tensor is None:
-        img_input = Input(shape=input_shape)
+        img_input = Input(shape=input_shape, name = "input_layer")
     else:
         if not K.is_keras_tensor(input_tensor):
-            img_input = Input(tensor=input_tensor, shape=input_shape)
+            img_input = Input(tensor=input_tensor, shape=input_shape, name = "input_layer")
         else:
             img_input = input_tensor
 
@@ -508,7 +508,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         inputs = img_input
     
     if activation in {'softmax','sigmoid'}:
-        x =Activation(activation)(x)
+        x =Activation(activation, , name = "output_layer")(x)
 
     model = Model(inputs, x, name='deeplabv3+')
 
@@ -534,7 +534,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
                                     WEIGHTS_PATH_MOBILE_CS,
                                     cache_subdir='models')
         model.load_weights(weights_path, by_name=True)
-        
+
     return model
 
 
