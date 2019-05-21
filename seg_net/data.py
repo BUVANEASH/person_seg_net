@@ -6,6 +6,7 @@ import glob
 import skimage.io as io
 import skimage.transform as trans
 import tensorflow as tf
+from keras.applications import imagenet_utils
 
 def weighted_cross_entropy(beta):
     '''
@@ -74,6 +75,11 @@ def preprocess_input(img, imgNorm="sub_mean"):
     elif imgNorm == "divide":
         img = img.astype(np.float32)
         img = img/255.0
+    elif imgNorm == "imagenet":
+        img = imagenet_utils.preprocess_input(img, mode='tf')
+    else:
+        img = img
+
     return img
         
 def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True, alpha = True, num_class=2):

@@ -276,7 +276,7 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, ski
     return x
 
 
-def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, backbone='mobilenetv2', OS=16, alpha=1., activation = 'softmax'):
+def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, backbone='mobilenetv2', OS=16, alpha=1., activation = None):
     """ Instantiates the Deeplabv3+ architecture
 
     Optionally loads weights pre-trained
@@ -508,7 +508,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         inputs = img_input
     
     if activation in {'softmax','sigmoid'}:
-        x =Activation(activation, , name = "output_layer")(x)
+        x =Activation(activation, name = "output_layer")(x)
 
     model = Model(inputs, x, name='deeplabv3+')
 
