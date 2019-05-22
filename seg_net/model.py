@@ -15,6 +15,15 @@ https://github.com/JonathanCMitchell/mobilenet_v2_keras
     (https://arxiv.org/abs/1610.02357)
 - [Inverted Residuals and Linear Bottlenecks: Mobile Networks for
     Classification, Detection and Segmentation](https://arxiv.org/abs/1801.04381)
+
+weights='pascal_voc'
+input_tensor=None
+input_shape=(512, 512, 3)
+classes=21
+backbone='mobilenetv2'
+OS=16,
+alpha=1.
+activation=None
 """
 
 from __future__ import absolute_import
@@ -22,6 +31,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import tensorflow as tf
 
 from keras.models import Model
 from keras import layers
@@ -162,7 +172,8 @@ def _xception_block(inputs, depth_list, prefix, skip_connection_type, stride,
 
 
 def relu6(x):
-    return layers.ReLU(6.0)(x)
+    return K.tf.keras.activations.relu(x, max_value=6)
+
 
 def _make_divisible(v, divisor, min_value=None):
     if min_value is None:
@@ -216,7 +227,8 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, ski
     return x
 
 
-def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, backbone='mobilenetv2', OS=16, alpha=1., activation=None):
+def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, 
+            backbone='mobilenetv2', OS=16, alpha=1., activation='sigmoid', re_init_last = False):
     """ Instantiates the Deeplabv3+ architecture
 
     Optionally loads weights pre-trained
@@ -372,13 +384,15 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     # Image Feature branch
     shape_before = x.shape
     b4 = GlobalAveragePooling2D()(x)
-    b4 = K.expand_dims(K.expand_dims(b4, 1),1) # from (b_size, channels)->(b_size, 1, 1, channels)
+    b4 = Lambda(lambda x: K.tf.expand_dims(K.tf.expand_dims(x, 1), 1))(b4) # from (b_size, channels)->(b_size, 1, 1, channels)
     b4 = Conv2D(256, (1, 1), padding='same',
                 use_bias=False, name='image_pooling')(b4)
     b4 = BatchNormalization(name='image_pooling_BN', epsilon=1e-5)(b4)
     b4 = Activation('relu')(b4)
     #upsample. have to use compat because of the option align_corners
-    b4 = Lambda(lambda x: K.tf.image.resize_bilinear(x, shape_before[1:3],align_corners=True))(b4) 
+    b4 = Lambda(lambda x: K.tf.image.resize(x, shape_before[1:3],
+                                                    method=K.tf.image.ResizeMethod.BILINEAR,
+                                                    align_corners=True))(b4) 
 
     # simple 1x1
     b0 = Conv2D(256, (1, 1), padding='same', use_bias=False, name='aspp0')(x)
@@ -412,8 +426,10 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     if backbone == 'xception':
         # Feature projection
         # x4 (x2) block
-        x = Lambda(lambda xx: K.tf.image.resize_bilinear(xx,
-                                                x.shape[1:3]*(OS//4),align_corners=True))(x) 
+        x = Lambda(lambda xx: K.tf.image.resize(xx,
+                                                x.shape[1:3]*(OS//4),
+                                                method=K.tf.image.ResizeMethod.BILINEAR,
+                                                align_corners=True))(x) 
         dec_skip1 = Conv2D(48, (1, 1), padding='same',
                            use_bias=False, name='feature_projection0')(skip1)
         dec_skip1 = BatchNormalization(
@@ -432,8 +448,10 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         last_layer_name = 'custom_logits_semantic'
 
     x = Conv2D(classes, (1, 1), padding='same', name=last_layer_name)(x)
-    x = Lambda(lambda xx: K.tf.image.resize_bilinear(xx,
-                                                   img_input.shape[1:3],align_corners=True))(x) 
+    x = Lambda(lambda xx: K.tf.image.resize(xx,
+                                           img_input.shape[1:3],
+                                           method=K.tf.image.ResizeMethod.BILINEAR,
+                                           align_corners=True))(x) 
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
@@ -443,7 +461,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         inputs = img_input
 
     if activation in {'softmax','sigmoid'}:
-        x = Activation(activation)(x)
+        x = Activation(activation, name = "output_layer")(x)
     
     model = Model(inputs, x, name='deeplabv3plus')
 
@@ -469,6 +487,13 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
                                     WEIGHTS_PATH_MOBILE_CS,
                                     cache_subdir='models')
         model.load_weights(weights_path, by_name=True)
+
+    if re_init_last:
+        session = K.get_session()
+        for layer in model.layers[-3 if activation in {'softmax','sigmoid'} else -2:]: 
+            if hasattr(layer, 'kernel_initializer'):
+                layer.kernel.initializer.run(session=session)
+
     return model
 
 

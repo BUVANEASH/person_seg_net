@@ -276,7 +276,8 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, ski
     return x
 
 
-def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, backbone='mobilenetv2', OS=16, alpha=1., activation = None):
+def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, 
+            backbone='mobilenetv2', OS=16, alpha=1., activation='sigmoid', re_init_last = False):
     """ Instantiates the Deeplabv3+ architecture
 
     Optionally loads weights pre-trained
@@ -315,9 +316,9 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
 
     """
 
-    if not (weights in {'pascal_voc', None}):
+    if not (weights in {'pascal_voc', 'cityscapes', None}):
         raise ValueError('The `weights` argument should be either '
-                         '`None` (random initialization) or `pascal_voc` '
+                         '`None` (random initialization), `pascal_voc`, or `cityscapes` '
                          '(pre-trained on PASCAL VOC)')
 
     if K.backend() != 'tensorflow':
@@ -534,6 +535,12 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
                                     WEIGHTS_PATH_MOBILE_CS,
                                     cache_subdir='models')
         model.load_weights(weights_path, by_name=True)
+    
+    if re_init_last:
+        session = K.get_session()
+        for layer in model.layers[-3 if activation in {'softmax','sigmoid'} else -2:]: 
+            if hasattr(layer, 'kernel_initializer'):
+                layer.kernel.initializer.run(session=session)
 
     return model
 

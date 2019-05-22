@@ -129,7 +129,7 @@ def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True,
 
 def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict,image_color_mode = "rgb",
                     mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
-                    imgNorm="sub_mean" , binary = False, multiclass = True, num_class=2, alpha =True, save_to_dir = None, 
+                    imgNorm="divide" , binary = False, multiclass = True, num_class=2, alpha =False, save_to_dir = None, 
                    target_size = (240,240),seed = 1):
     '''
     Generates Train image and mask pairs.
