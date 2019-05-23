@@ -1,6 +1,6 @@
 tflite_convert \
---output_file=sample_tf.tflite \
---graph_def_file=mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_op.pb \
+--output_file=mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_Q.tflite \
+--graph_def_file=mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_op.pb \
 --output_format=TFLITE \
 --inference_type=FLOAT \
 --inference_input_type=FLOAT \
@@ -23,8 +23,8 @@ tflite_convert \
 --allow_custom_ops
 
 toco \
---output_file=sample.tflite \
---graph_def_file=mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
+--output_file=mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_Q.tflite \
+--graph_def_file=mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte.pb \
 --output_format=TFLITE \
 --inference_type=FLOAT \
 --inference_input_type=FLOAT \
@@ -35,8 +35,8 @@ toco \
 --allow_custom_ops
 
 toco \
---output_file=sample.tflite \
---keras_model_file=mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.hdf5 \
+--output_file=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_Q.pb \
+--keras_model_file=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte.hdf5 \
 --output_format=TFLITE \
 --inference_type=FLOAT \
 --inference_input_type=FLOAT \
@@ -47,21 +47,21 @@ toco \
 --allow_custom_ops
 
 bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
---in_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
---out_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_opt.pb \
+--in_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte.pb \
+--out_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_opt.pb \
 --inputs='input_1' \
 --outputs='sigmoid/Sigmoid' \
 --transforms='
   strip_unused_nodes
   remove_nodes(op=Identity, op=CheckNumerics)
   fold_constants(ignore_errors=true)
-  fold_batch_norms
+  fold_batch_norms'
   
 
 
 bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
---in_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512.pb \
---out_graph=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Unet_BCE_ACC_IOU_1_sigmoid_512_Qopt.pb \
+--in_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte.pb \
+--out_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_Qotp.pb \
 --inputs='input_1' \
 --outputs='sigmoid/Sigmoid' \
 --transforms='

@@ -1,5 +1,6 @@
 import keras
 import keras.backend as K
+import segmentation_models as sm
 # 1,259,685
 
 def _make_divisible(v, divisor, min_value=None):
@@ -68,7 +69,20 @@ def pyramid_pooling_block(input_tensor, bin_sizes):
 
     return keras.layers.Concatenate()(concat_list)
 
-def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19, activation = 'softmax', dropout_rate = 0.3):
+#(1024, 2048, 3)
+'''
+input_shape = (528, 528, 3)
+num_classes = 1
+activation = 'sigmoid'
+dropout_rate = 0
+backbone_name = 'mobilenetv2'
+'''
+def fast_scnn(pretrained = None, 
+            input_shape = (768, 768, 3), 
+            num_classes = 1, 
+            activation = 'sigmoid', 
+            dropout_rate = 0.3,
+            backbone_name = 'mobilenetv2'):
     '''
     Fast SCNN Model
 
@@ -81,19 +95,32 @@ def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19
     Returns:
         Keras Model of fast_scnn.
     '''
-    
-    # Input Layer
-    input_layer = keras.layers.Input(shape = input_shape, name = 'input_layer')
 
-    lds_layer = conv_block(input_layer, 'conv', 32, (3, 3), strides = (2, 2))
-    lds_layer = conv_block(lds_layer, 'ds', 48, (3, 3), strides = (2, 2))
-    lds_layer = conv_block(lds_layer, 'ds', 64, (3, 3), strides = (2, 2))
-    
-    """#### Assembling all the methods"""
-    gfe_layer = bottleneck_block(lds_layer, 64, (3, 3), t = 6, strides = (2, 2), n = 3)
-    gfe_layer = bottleneck_block(gfe_layer, 96, (3, 3), t = 6, strides = (2, 2), n = 3)
-    gfe_layer = bottleneck_block(gfe_layer, 128, (3, 3), t = 6, strides = (1, 1), n = 3)
-    gfe_layer = pyramid_pooling_block(gfe_layer, [1,2,3,6])
+    if backbone_name in {'mobilenetv2'}:
+        assert input_shape[0] == input_shape[1]
+        assert input_shape[0]%48 == 0 and input_shape[1]%48 == 0
+        
+    # Input Layer
+    if backbone_name in {'mobilenetv2'}:
+        base_model = sm.PSPNet(backbone_name, encoder_weights='imagenet',
+                              classes=num_classes,
+                              activation=None, 
+                              input_shape = input_shape
+                              )
+        lds_layer = base_model.layers[9].output
+        gfe_layer = base_model.layers[-6].output
+    else:
+        input_layer = keras.layers.Input(shape = input_shape, name = 'input_layer')
+
+        lds_layer = conv_block(input_layer, 'conv', 32, (3, 3), strides = (2, 2))
+        lds_layer = conv_block(lds_layer, 'ds', 48, (3, 3), strides = (2, 2))
+        lds_layer = conv_block(lds_layer, 'ds', 64, (3, 3), strides = (2, 2))
+        
+        """#### Assembling all the methods"""
+        gfe_layer = bottleneck_block(lds_layer, 64, (3, 3), t = 6, strides = (2, 2), n = 3)
+        gfe_layer = bottleneck_block(gfe_layer, 96, (3, 3), t = 6, strides = (2, 2), n = 3)
+        gfe_layer = bottleneck_block(gfe_layer, 128, (3, 3), t = 6, strides = (1, 1), n = 3)
+        gfe_layer = pyramid_pooling_block(gfe_layer, [1,2,3,6])
 
     """## Step 3: Feature Fusion"""
 
@@ -116,12 +143,17 @@ def fast_scnn(pretrained = None, input_shape = (1024, 2048, 3), num_classes = 19
     classifier = conv_block(classifier, 'conv', num_classes, (1, 1), strides=(1, 1), padding='same', relu=True, batchnorm = True)
     if dropout_rate:
         classifier = keras.layers.Dropout( rate = dropout_rate )(classifier)
-    classifier = keras.layers.UpSampling2D((8, 8))(classifier)
+    if backbone_name in {'mobilenetv2'}:
+        classifier = keras.layers.UpSampling2D((2, 2))(classifier)
+    else:
+        classifier = keras.layers.UpSampling2D((8, 8))(classifier)
     classifier = keras.layers.Activation(activation, name = 'output_layer')(classifier)
 
     """## Model Compilation"""
-
-    fast_scnn = keras.Model(inputs = input_layer , outputs = classifier, name = 'Fast_SCNN')
+    if backbone_name in {'mobilenetv2'}:
+        fast_scnn = keras.Model(inputs = base_model.input , outputs = classifier, name = 'Fast_SCNN')
+    else:
+        fast_scnn = keras.Model(inputs = input_layer , outputs = classifier, name = 'Fast_SCNN')
     
     if pretrained:
         fast_scnn.load_weights(pretrained, by_name=True)

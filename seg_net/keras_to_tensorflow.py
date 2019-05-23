@@ -49,7 +49,6 @@ def freeze_keras(sess, input_node_names, output_node_names, optimize = False, qu
 
     if optimize:
         transforms = [
-                         "remove_nodes(op=Identity)", 
                          "merge_duplicate_nodes",
                          "strip_unused_nodes",
                          "fold_constants(ignore_errors=true)",
