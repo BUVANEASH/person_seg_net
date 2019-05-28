@@ -7,6 +7,7 @@ import skimage.io as io
 import skimage.transform as trans
 import tensorflow as tf
 from keras.applications import imagenet_utils
+import imgaug.augmenters as iaa
 
 def weighted_cross_entropy(beta):
     '''
@@ -50,12 +51,49 @@ def lr_scheduler(epoch, lr):
         return lr * decay_rate
     return lr
 
+def temporal_augmentation(imgs,masks):
+    '''
+    Augments masks as 4th channel to the RGB image and adds motions blur to the image.
+
+    Args:
+        imgs (ndarray): Input image.
+        masks (ndarray): Mask image to be augmented as previous mask image.
+
+    Returns
+        4 Channel Images [R,G,B,M]
+    '''
+    
+    seq_image = iaa.Sequential([
+                            iaa.MotionBlur(k=3),
+                            iaa.ElasticTransformation(alpha=2,sigma=5)
+                        ]) 
+
+    seq_mask = iaa.Sequential([
+                            iaa.Affine(translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
+                                       scale=(0.999,1.111),
+                                       rotate=(-2, 2),
+                                       shear=(-2, 2))
+                        ]) 
+
+
+    new_images = seq_image.augment_images(imgs)
+    new_masks = seq_mask.augment_images(masks)
+
+    images_4ch = np.append(new_images,new_masks,axis=-1)
+
+    if np.random.random() > 0.5:
+        images_4ch[:,:,:,-1] = 0
+
+    return images_4ch
+
+
+
 def preprocess_input(img, imgNorm="sub_mean"):
     '''
     Preprocess the Input.
 
     Args:
-        img (uint8): Input image.
+        img (ndarray): Input image.
         imgNorm (str): Normalization Type
             - "sub_and_divide"
             - "sub_mean"
@@ -82,13 +120,13 @@ def preprocess_input(img, imgNorm="sub_mean"):
 
     return img
         
-def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True, alpha = True, num_class=2):
+def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True, alpha = True, num_class=2, temp_aug = False):
     '''
     Adjusts Image and Annotation before feeding to model training.
 
     Args:
-        img (uint8): Input Image.
-        mask (uint8): Mask Annotation Image.
+        img (ndarray): Input Image.
+        mask (ndarray): Mask Annotation Image.
         imgNorm (str): Image Normalization type.
              "sub_and_divide"
             - "sub_mean"
@@ -125,12 +163,15 @@ def adjustData(img,mask, imgNorm="sub_mean" , binary = False, multiclass = True,
     else:
         new_mask = np.array( mask / np.max(mask) ,dtype=np.float32)
     
+    if temp_aug:
+        img = temporal_augmentation(img,new_mask)
+
     return (img,new_mask)
 
 def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict,image_color_mode = "rgb",
                     mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
                     imgNorm="divide" , binary = False, multiclass = True, num_class=2, alpha =False, save_to_dir = None, 
-                   target_size = (240,240),seed = 1):
+                   target_size = (240,240),seed = 1, temp_aug = False):
     '''
     Generates Train image and mask pairs.
     
@@ -157,6 +198,7 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict,image
         save_to_dir (str): Directory to save the augmented image and mask pair.
         target_size (tuple(int)): Target image size to resize.
         seed (float): Random seed.
+        temp_aug (bool): Temporal 4th channel augmentation.
 
     Yeilds:
         Image and Mask Annotation Pairs.
@@ -185,13 +227,13 @@ def trainGenerator(batch_size,train_path,image_folder,mask_folder,aug_dict,image
         seed = seed)
     train_generator = zip(image_generator, mask_generator)
     for (img,mask) in train_generator:
-        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, alpha, num_class)
+        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, alpha, num_class, temp_aug)
         yield (img,mask)
 
 def validationGenerator(batch_size,train_path,image_folder,mask_folder,image_color_mode = "rgb",
                     mask_color_mode = "grayscale",image_save_prefix  = "image",mask_save_prefix  = "mask",
                     imgNorm="sub_mean" , binary = False, multiclass = True, num_class=2, alpha =True, save_to_dir = None,
-                    target_size = (240,240),seed = 1):
+                    target_size = (240,240),seed = 1, temp_aug = False):
     '''
     Generates Validation image and mask pairs.
     
@@ -218,6 +260,7 @@ def validationGenerator(batch_size,train_path,image_folder,mask_folder,image_col
         save_to_dir (str): Directory to save the augmented image and mask pair.
         target_size (tuple(int)): Target image size to resize.
         seed (float): Random seed.
+        temp_aug (bool): Temporal 4th channel augmentation.
 
     Yeilds:
         Image and Mask Annotation Pairs.
@@ -246,7 +289,7 @@ def validationGenerator(batch_size,train_path,image_folder,mask_folder,image_col
         seed = seed)
     train_generator = zip(image_generator, mask_generator)
     for (img,mask) in train_generator:
-        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, alpha, num_class)
+        img,mask = adjustData(img, mask, imgNorm, binary, multiclass, alpha, num_class, temp_aug)
         yield (img,mask)
 
 def testGenerator(test_path,target_size = (256,256),as_gray = False):

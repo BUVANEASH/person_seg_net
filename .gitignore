@@ -1,6 +1,7 @@
 **/__pycache__/
 **/data/
 **/results/
+**/temp/
 notebooks/model/
 notebooks/weights/
 cmd.txt

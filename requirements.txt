@@ -7,3 +7,4 @@ pillow
 coremltools
 matplotlib
 opencv-python
+imgaug

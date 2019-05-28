@@ -1,12 +1,12 @@
 tflite_convert \
---output_file=mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_Q.tflite \
---graph_def_file=mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_op.pb \
+--output_file=mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person_Q.pb \
+--graph_def_file=mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person.pb \
 --output_format=TFLITE \
 --inference_type=FLOAT \
 --inference_input_type=FLOAT \
---input_arrays=input_1 \
---input_shapes=1,512,512,3 \
---output_arrays=sigmoid/Sigmoid \
+--input_arrays=input_layer \
+--input_shapes=1,256,256,3 \
+--output_arrays=output_layer/Sigmoid \
 --post_training_quantize \
 --allow_custom_ops
 
@@ -35,14 +35,14 @@ toco \
 --allow_custom_ops
 
 toco \
---output_file=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte_Q.pb \
---keras_model_file=/media/new_hdd2/seg_net/results/Models/Models/mobilenetv2_Linknet_BCE_ACC_IOU_divide_1_sigmoid_512_train_matte.hdf5 \
+--output_file=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person_Q.pb \
+--keras_model_file=/media/new_hdd2/seg_net/results/Models/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person.hdf5 \
 --output_format=TFLITE \
 --inference_type=FLOAT \
 --inference_input_type=FLOAT \
---input_arrays=input_1 \
---input_shapes=1,512,512,3 \
---output_arrays=sigmoid/Sigmoid \
+--input_arrays=input_layer \
+--input_shapes=1,256,256,3 \
+--output_arrays=output_layer/Sigmoid \
 --post_training_quantize \
 --allow_custom_ops
 
@@ -74,6 +74,20 @@ bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
   quantize_nodes
   strip_unused_nodes
   sort_by_execution_order'
+
+freeze_graph \
+--input_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person.pb \
+--output_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person_.pb \
+--output_node_names='output_layer/Sigmoid' \
+--clear_devices
+
+
+
+
+
+
+
+
 
 python3 keras_to_tf.py --input_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5 \
 --output_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768_quantized.pb \
