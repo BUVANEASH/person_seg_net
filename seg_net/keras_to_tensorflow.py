@@ -36,38 +36,48 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
                                                                               output_names, freeze_var_names)
         return frozen_graph
 
-def freeze_keras(sess, input_node_names, output_node_names, optimize = False, quantize=False, clear_devices = True, add_tf_global = False):
+def freeze_keras(sess, output_node_names, clear_devices = True, 
+                  add_tf_global = False, transform = None):
 
     if add_tf_global:
-        output_node_names += [v.op.name for v in tf.global_variables()]
+      output_node_names += [v.op.name for v in tf.global_variables()]
 
     graphDef = sess.graph.as_graph_def()
 
     if clear_devices:
-        for node in graphDef.node:
-            node.device = ""
+      for node in graphDef.node:
+          node.device = ""
 
-    if optimize:
+    if transform in {'optimize', 'quantize'}:
+      if transform == 'optimize':
         transforms = [
-                         "merge_duplicate_nodes",
-                         "strip_unused_nodes",
-                         "fold_constants(ignore_errors=true)",
-                         "fold_batch_norms",
-                         "fold_old_batch_norms",
-                         "sort_by_execution_order"
-                        ]
-        graphDef = TransformGraph(graphDef, [],
-                                               output_node_names,
-                                               transforms)
+                       "add_default_attributes",
+                       "merge_duplicate_nodes",
+                       "remove_nodes(op=Identity, op=CheckNumerics)",
+                       "fold_constants(ignore_errors=true)",
+                       "fold_batch_norms",
+                       "fold_old_batch_norms",
+                       "strip_unused_nodes",
+                       "sort_by_execution_order",
+                      ]
+      elif transform == 'quantize':
+        transforms = [
+                       "add_default_attributes",
+                       "merge_duplicate_nodes",
+                       "remove_nodes(op=Identity, op=CheckNumerics)",
+                       "fold_constants(ignore_errors=true)",
+                       "fold_batch_norms",
+                       "fold_old_batch_norms",
+                       "quantize_weights", 
+                       "quantize_nodes",
+                       "strip_unused_nodes",
+                       "sort_by_execution_order"
+                      ]
+      graphDef = TransformGraph(graphDef, [],
+                                             output_node_names,
+                                             transforms)
 
-    if quantize:
-        transforms = ["quantize_weights", "quantize_nodes"]
-        graphDef = TransformGraph(graphDef, [],
-                                               output_node_names,
-                                               transforms)
-
-    constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(
-                                                                            sess,
+    constant_graph = tf.compat.v1.graph_util.convert_variables_to_constants(sess,
                                                                             graphDef,
                                                                             output_node_names)
 

@@ -75,6 +75,21 @@ bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
   strip_unused_nodes
   sort_by_execution_order'
 
+
+bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
+  --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.tflite \
+  --num_threads=1
+
+bazel-bin/tensorflow/tools/benchmark/benchmark_model \
+  --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.pb \
+  --input_layer="input_1:0" \
+  --input_layer_shape="1,256,256,3" \
+  --input_layer_type="float" \
+  --output_layer="sigmoid/Sigmoid:0" \
+  --num_threads=1
+
+
+
 freeze_graph \
 --input_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person.pb \
 --output_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person_.pb \
@@ -96,3 +111,36 @@ python3 keras_to_tf.py --input_model=/media/new_hdd2/seg_net/results/Models/Mode
 tflite_convert \
   --output_file=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768_quantized.tflite \
   --keras_model_file=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5
+
+
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+(1) Build for your specific platform, e.g.:
+
+bazel build -c opt \
+  --config=android_arm \
+  --cxxopt='--std=c++11' \
+  tensorflow/lite/tools/benchmark:benchmark_model
+
+(2) Connect your phone. Push the binary to your phone with adb push (make the directory if required):
+
+adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model /data/local/tmp
+
+(3) Make the binary executable.
+
+adb shell chmod +x /data/local/tmp/benchmark_model
+
+(4) Push the compute graph that you need to test. For example:
+
+adb push /media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.tflite /data/local/tmp
+
+(5) Run the benchmark. For example:
+
+adb shell /data/local/tmp/benchmark_model \
+  --graph=/data/local/tmp/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.tflite \
+  --num_threads=4
+
+

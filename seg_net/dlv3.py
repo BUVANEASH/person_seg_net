@@ -16,14 +16,6 @@ https://github.com/JonathanCMitchell/mobilenet_v2_keras
 - [Inverted Residuals and Linear Bottlenecks: Mobile Networks for
     Classification, Detection and Segmentation](https://arxiv.org/abs/1801.04381)
 
-weights='pascal_voc'
-input_tensor=None
-input_shape=(512, 512, 3)
-classes=21
-backbone='mobilenetv2'
-OS=16,
-alpha=1.
-activation=None
 """
 
 from __future__ import absolute_import
@@ -182,7 +174,7 @@ def _make_divisible(v, divisor, min_value=None):
     return new_v
 
 
-def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, skip_connection, rate=1):
+def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, skip_connection, rate=1, skip_out = False):
     in_channels =  int(inputs.shape[-1]) #inputs._keras_shape[-1]
     pointwise_conv_filters = int(filters * alpha)
     pointwise_filters = _make_divisible(pointwise_conv_filters, 8)
@@ -196,7 +188,8 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, ski
                    name=prefix + 'expand')(x)
         x = BatchNormalization(epsilon=1e-3, momentum=0.999,
                                name=prefix + 'expand_BN')(x)
-        x = layers.ReLU(6.0, name=prefix + 'expand_relu')(x)
+        skip1 = layers.ReLU(6.0, name=prefix + 'expand_relu')(x)
+        x = skip1
     else:
         prefix = 'expanded_conv_'
     # Depthwise
@@ -216,16 +209,35 @@ def _inverted_res_block(inputs, expansion, stride, alpha, filters, block_id, ski
                            name=prefix + 'project_BN')(x)
 
     if skip_connection:
-        return Add(name=prefix + 'add')([inputs, x])
+        if skip_out:
+            return Add(name=prefix + 'add')([inputs, x]), skip1
+        else:
+            return Add(name=prefix + 'add')([inputs, x])
 
     # if in_channels == pointwise_filters and stride == 1:
     #    return Add(name='res_connect_' + str(block_id))([inputs, x])
 
-    return x
+    if skip_out:
+        return x, skip1
+    else:
+        return x
 
+
+'''
+weights='pascal_voc'
+input_tensor=None
+input_shape=(256, 256, 3)
+classes=1
+backbone='mobilenetv2'
+OS=8,
+alpha=1.
+activation=None
+add_aspp = True
+mn_decoder = True
+'''
 
 def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, 
-            backbone='mobilenetv2', OS=16, alpha=1., activation='sigmoid', re_init_last = False):
+            backbone='mobilenetv2', OS=16, alpha=1., activation='sigmoid', add_aspp = False, mn_decoder = False):
     """ Instantiates the Deeplabv3+ architecture
 
     Optionally loads weights pre-trained
@@ -271,19 +283,22 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         img_input = Input(shape=input_shape)
     else:
         img_input = input_tensor
+        
+    if backbone == 'mobilenetv2':
+        OS = 8
+        
+    if OS == 8:
+        entry_block3_stride = 1
+        middle_block_rate = 2  # ! Not mentioned in paper, but required
+        exit_block_rates = (2, 4)
+        atrous_rates = (12, 24, 36)
+    else:
+        entry_block3_stride = 2
+        middle_block_rate = 1
+        exit_block_rates = (1, 2)
+        atrous_rates = (6, 12, 18)
 
     if backbone == 'xception':
-        if OS == 8:
-            entry_block3_stride = 1
-            middle_block_rate = 2  # ! Not mentioned in paper, but required
-            exit_block_rates = (2, 4)
-            atrous_rates = (12, 24, 36)
-        else:
-            entry_block3_stride = 2
-            middle_block_rate = 1
-            exit_block_rates = (1, 2)
-            atrous_rates = (6, 12, 18)
-
         x = Conv2D(32, (3, 3), strides=(2, 2),
                    name='entry_flow_conv1_1', use_bias=False, padding='same')(img_input)
         x = BatchNormalization(name='entry_flow_conv1_1_BN')(x)
@@ -316,7 +331,6 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
                             depth_activation=True)
 
     else:
-        OS = 8
         first_block_filters = _make_divisible(32 * alpha, 8)
         x = Conv2D(first_block_filters,
                    kernel_size=3,
@@ -334,8 +348,8 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         x = _inverted_res_block(x, filters=24, alpha=alpha, stride=1,
                                 expansion=6, block_id=2, skip_connection=True)
 
-        x = _inverted_res_block(x, filters=32, alpha=alpha, stride=2,
-                                expansion=6, block_id=3, skip_connection=False)
+        x, skip1 = _inverted_res_block(x, filters=32, alpha=alpha, stride=2,
+                                expansion=6, block_id=3, skip_connection=False, skip_out = True)
         x = _inverted_res_block(x, filters=32, alpha=alpha, stride=1,
                                 expansion=6, block_id=4, skip_connection=True)
         x = _inverted_res_block(x, filters=32, alpha=alpha, stride=1,
@@ -391,7 +405,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     b0 = Activation('relu', name='aspp0_activation')(b0)
 
     # there are only 2 branches in mobilenetV2. not sure why
-    if backbone == 'xception':
+    if backbone == 'xception' or add_aspp:
         # rate = 6 (12)
         b1 = SepConv_BN(x, 256, 'aspp1',
                         rate=atrous_rates[0], depth_activation=True, epsilon=1e-5)
@@ -414,7 +428,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     x = Dropout(0.1)(x)
     # DeepLab v.3+ decoder
 
-    if backbone == 'xception':
+    if backbone == 'xception' or mn_decoder:
         # Feature projection
         # x4 (x2) block
         x = Lambda(lambda xx: K.tf.image.resize(xx,

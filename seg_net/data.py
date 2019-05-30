@@ -9,6 +9,29 @@ import tensorflow as tf
 from keras.applications import imagenet_utils
 import imgaug.augmenters as iaa
 
+
+seq_image = iaa.Sequential([
+                            iaa.MotionBlur(k=3),
+                            iaa.ElasticTransformation(alpha=2,sigma=5)
+                        ]) 
+    
+seq_mask_dropout = iaa.Sequential([
+                                    iaa.PerspectiveTransform(scale=0.025),
+                                    iaa.CoarseDropout(p=0.1, size_percent=0.001),
+                                    iaa.Affine(translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
+                                               scale=(0.999,1.111),
+                                               rotate=(-2, 2),
+                                               shear=(-2, 2))
+                                    ])
+
+seq_mask = iaa.Sequential([
+                            iaa.PerspectiveTransform(scale=0.025),
+                            iaa.Affine(translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
+                                       scale=(0.999,1.111),
+                                       rotate=(-2, 2),
+                                       shear=(-2, 2))
+                            ])
+
 def weighted_cross_entropy(beta):
     '''
     Weighted Cross Entropy loss function
@@ -61,30 +84,26 @@ def temporal_augmentation(imgs,masks):
 
     Returns
         4 Channel Images [R,G,B,M]
-    '''
+    '''   
+
+
+    if np.random.random() > 0.3:
+        new_images = seq_image.augment_images(imgs)
+    else:
+        new_images = imgs
     
-    seq_image = iaa.Sequential([
-                            iaa.MotionBlur(k=3),
-                            iaa.ElasticTransformation(alpha=2,sigma=5)
-                        ]) 
-
-    seq_mask = iaa.Sequential([
-                            iaa.Affine(translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
-                                       scale=(0.999,1.111),
-                                       rotate=(-2, 2),
-                                       shear=(-2, 2))
-                        ]) 
-
-
-    new_images = seq_image.augment_images(imgs)
-    new_masks = seq_mask.augment_images(masks)
+    if np.random.random() > 0.5:
+        if np.random.random() > 0.85:
+            new_masks = seq_mask_dropout.augment_images(masks)
+        else:
+            new_masks = seq_mask.augment_images(masks)
+    else:
+        new_masks = np.zeros_like(masks)
 
     images_4ch = np.append(new_images,new_masks,axis=-1)
 
-    if np.random.random() > 0.5:
-        images_4ch[:,:,:,-1] = 0
 
-    return images_4ch
+    return np.array(images_4ch/255, dtype = np.float32)
 
 
 
