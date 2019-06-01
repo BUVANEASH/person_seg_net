@@ -77,8 +77,8 @@ bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
 
 
 bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
-  --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.tflite \
-  --num_threads=1
+  --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_MSE_ACC_IOU_divide_1_sigmoid_256_train_matte.tflite \
+  --num_threads=4
 
 bazel-bin/tensorflow/tools/benchmark/benchmark_model \
   --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.pb \
@@ -95,13 +95,6 @@ freeze_graph \
 --output_graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_deeplabv3_BCE_ACC_IOU_divide_1_sigmoid_256_train_person_.pb \
 --output_node_names='output_layer/Sigmoid' \
 --clear_devices
-
-
-
-
-
-
-
 
 
 python3 keras_to_tf.py --input_model=/media/new_hdd2/seg_net/results/Models/Models/resnet50_Unet_BCE_ACC_IOU_1_sigmoid_768.hdf5 \

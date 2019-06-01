@@ -17,19 +17,19 @@ seq_image = iaa.Sequential([
     
 seq_mask_dropout = iaa.Sequential([
                                     iaa.PerspectiveTransform(scale=0.025),
-                                    iaa.CoarseDropout(p=0.1, size_percent=0.001),
-                                    iaa.Affine(translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
-                                               scale=(0.999,1.111),
-                                               rotate=(-2, 2),
-                                               shear=(-2, 2))
+                                    iaa.CoarseDropout(p=0.1, size_percent=0.005),
+                                    iaa.Affine(translate_percent={"x": (-2, 2), "y": (-2, 2)},
+                                               scale=(0.99,1.11),
+                                               rotate=(-5, 5),
+                                               shear=(-5, 5))
                                     ])
 
 seq_mask = iaa.Sequential([
                             iaa.PerspectiveTransform(scale=0.025),
-                            iaa.Affine(translate_percent={"x": (-0.01, 0.01), "y": (-0.01, 0.01)},
-                                       scale=(0.999,1.111),
-                                       rotate=(-2, 2),
-                                       shear=(-2, 2))
+                            iaa.Affine(translate_percent={"x": (-2, 2), "y": (-2, 2)},
+                                       scale=(0.99,1.11),
+                                       rotate=(-5, 5),
+                                       shear=(-5, 5))
                             ])
 
 def weighted_cross_entropy(beta):
@@ -85,15 +85,16 @@ def temporal_augmentation(imgs,masks):
     Returns
         4 Channel Images [R,G,B,M]
     '''   
-
+    imgs = np.uint8(imgs*255)
+    masks = np.uint8(masks*255)
 
     if np.random.random() > 0.3:
         new_images = seq_image.augment_images(imgs)
     else:
         new_images = imgs
     
-    if np.random.random() > 0.5:
-        if np.random.random() > 0.85:
+    if np.random.random() > 0.85:
+        if np.random.random() > 0.5:
             new_masks = seq_mask_dropout.augment_images(masks)
         else:
             new_masks = seq_mask.augment_images(masks)

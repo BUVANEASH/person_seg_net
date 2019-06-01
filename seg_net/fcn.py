@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+import sys
+sys.path.append("..")
 import segmentation_models as sm
 import keras
 import keras.backend as K
@@ -67,9 +68,13 @@ def ConvRelu(filters, kernel_size = 3, stride = 1, use_batchnorm=False, conv_nam
         return x
     return layer
 
-def densenet_matte(filters, kernel_size = 3, stride = 1, use_batchnorm=False, sep_conv = True, n_layers = 3):
+def densenet_matte(filters, classes, kernel_size = 3, stride = 1, use_batchnorm=False, sep_conv = True, n_layers = 3, skip = None):
     
-    def layer(x):
+    def layer(input_tensor):
+        x = input_tensor
+
+        if skip is not None:
+            x = keras.layers.Add()([x, skip])
         
         for i in range(1,n_layers+1):
             if not sep_conv:
@@ -77,7 +82,17 @@ def densenet_matte(filters, kernel_size = 3, stride = 1, use_batchnorm=False, se
                                                  padding='same', name='densenet_matt{}'.format(i))(x)
             else:
                 x = SepConv_BN(filters, 'densenet_matt{}'.format(i), stride=stride, kernel_size=kernel_size, rate=1,
-                           use_batchnorm=True, depth_activation=True, epsilon=1e-3)(x)
+                           use_batchnorm=use_batchnorm, depth_activation=True, epsilon=1e-3)(x)
+
+        if not sep_conv:
+                x = keras.layers.Conv2D(classes, (3,3) , strides = (1,1),
+                                                 padding='same', name='densenet_matt_final_conv')(x)
+        else:
+            x = SepConv_BN(classes, 'densenet_matt_final_conv', stride=1, kernel_size=3, rate=1,
+                       use_batchnorm=use_batchnorm, depth_activation=True, epsilon=1e-3)(x)
+
+        if skip is not None:
+            x = keras.layers.Add()([x, input_tensor])
         
         return x
     
@@ -93,9 +108,8 @@ def Upsample2D_Block(filters, stage, kernel_size=3, upsample=(256,256),
         else:
             layer_name = 'upsample{}_'.format(stage)
 
-        x = keras.layers.Lambda(lambda xx: tf.image.resize(xx,
+        x = keras.layers.Lambda(lambda xx: K.tf.image.resize_bilinear(xx,
                                                 upsample,
-                                                method=tf.image.ResizeMethod.BILINEAR,
                                                 align_corners=True))(input_tensor)        
 
         if not sep_conv:  
@@ -126,6 +140,7 @@ def FCN8(pretrained = None,
          pooling=None,
          classes = 1,
          activation = 'sigmoid',
+         densenet_matting_filters = 64,
          densenet_matting_layers = 3,
          sep_conv = False,
          matt_sep_conv = False,
@@ -181,22 +196,28 @@ def FCN8(pretrained = None,
                          skip=None, use_batchnorm=False, sep_conv = True)(x)
     
     if densenet_matting_layers:
-        dense_matt_skip = x
-        x = keras.layers.Add()([x, img_input])
-        x = densenet_matte(64, kernel_size = 3, stride = 1, 
-                           use_batchnorm=False, sep_conv = matt_sep_conv, n_layers = densenet_matting_layers)(x)
-        if not sep_conv:
-            x = keras.layers.Conv2D(classes, kernel_size = (1,1) , strides = (1,1),
-                                             padding='same', name='densenet_matt_final_conv')(x)
-        else:
-            x = SepConv_BN(classes, 'densenet_matt_final_conv', stride=1, kernel_size=1, rate=1,
-                       use_batchnorm=True, depth_activation=True, epsilon=1e-3)(x)
-        x = keras.layers.Add()([x, dense_matt_skip])
-    
-    if activation in {'softmax','sigmoid'}:
-        x = keras.layers.Activation(activation, name=activation)(x)
-    
-    model = keras.Model(encoder.input, x)
+        _model = keras.Model(img_input, x)
+        
+        for layer in _model.layers:
+            layer.trainable = False
+            
+        x = _model.output
+        densenet_matte_skip = img_input
+
+        x = densenet_matte(densenet_matting_filters, classes = classes, kernel_size = 3, stride = 1, 
+                           use_batchnorm=False, sep_conv = matt_sep_conv, 
+                           n_layers = densenet_matting_layers, skip = densenet_matte_skip)(x)
+        
+        if activation in {'softmax','sigmoid'}:
+	        x = keras.layers.Activation(activation, name=activation)(x)
+            
+        model = keras.Model(img_input, x)
+	        
+    else:
+	    if activation in {'softmax','sigmoid'}:
+	        x = keras.layers.Activation(activation, name=activation)(x)
+	    
+	    model = keras.Model(img_input, x)
 
     if pretrained:
         print("LOADING ",pretrained)
