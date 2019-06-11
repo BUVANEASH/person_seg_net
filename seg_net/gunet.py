@@ -138,6 +138,8 @@ def Unet(pretrained = None,
         img_input = keras.layers.Input(shape=input_shape)
     else:
         img_input = input_tensor
+        
+    assert n_upsample_blocks == len(decoder_filters)
     
     if backbone == 'mobilenetv2':
 	    encoder = MobileNetV2(input_shape=None,
@@ -151,22 +153,24 @@ def Unet(pretrained = None,
 
     encoder_features = sm.backbones.get_feature_layers(backbone, n=4)
     
-    skip_connection_idx = ([sm.utils.get_layer_number(encoder, l) if isinstance(l, str) else l
-                                        for l in encoder_features])
+    skip_connection_idx = [-1] + ([sm.utils.get_layer_number(encoder, l) if isinstance(l, str) else l
+                                                                    for l in encoder_features])
+
+    skip_connections = skip_connection_idx[len(skip_connection_idx)-n_upsample_blocks:]
 
     if freeze_encoder:
         for layer in encoder.layers:
             if not isinstance(layer, keras.layers.BatchNormalization):
                 layer.trainable = False
     
-    x = encoder.output
-
+    x = encoder.layers[skip_connections.pop(0)].output
+    
     for i in range(n_upsample_blocks):
-            idx = (len(skip_connection_idx)-i)
+            idx = (len(skip_connections)-i)
             # check if there is a skip connection
             skip_connection = None
-            if i < len(skip_connection_idx):
-                skip_connection = encoder.layers[skip_connection_idx[i]].output
+            if i < len(skip_connections):
+                skip_connection = encoder.layers[skip_connections[i]].output
     
             upsample = sm.utils.to_tuple((int(np.ceil(input_shape[0]/2**idx)),int(np.ceil(input_shape[1]/2**idx))))
     

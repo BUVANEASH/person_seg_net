@@ -17,8 +17,8 @@ seq_image = iaa.Sequential([
     
 seq_mask_dropout = iaa.Sequential([
                                     iaa.PerspectiveTransform(scale=0.025),
-                                    iaa.CoarseDropout(p=0.1, size_percent=0.005),
-                                    iaa.Affine(translate_percent={"x": (-2, 2), "y": (-2, 2)},
+                                    iaa.CoarseDropout(p=0.1, size_percent=0.0001),
+                                    iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)},
                                                scale=(0.99,1.11),
                                                rotate=(-5, 5),
                                                shear=(-5, 5))
@@ -26,10 +26,10 @@ seq_mask_dropout = iaa.Sequential([
 
 seq_mask = iaa.Sequential([
                             iaa.PerspectiveTransform(scale=0.025),
-                            iaa.Affine(translate_percent={"x": (-2, 2), "y": (-2, 2)},
-                                       scale=(0.99,1.11),
-                                       rotate=(-5, 5),
-                                       shear=(-5, 5))
+                            iaa.Affine(translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)},
+                                               scale=(0.99,1.11),
+                                               rotate=(-5, 5),
+                                               shear=(-5, 5))
                             ])
 
 def weighted_cross_entropy(beta):
@@ -93,7 +93,7 @@ def temporal_augmentation(imgs,masks):
     else:
         new_images = imgs
     
-    if np.random.random() > 0.85:
+    if np.random.random() > 0.25:
         if np.random.random() > 0.5:
             new_masks = seq_mask_dropout.augment_images(masks)
         else:

@@ -81,7 +81,7 @@ bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
   --num_threads=4
 
 bazel-bin/tensorflow/tools/benchmark/benchmark_model \
-  --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_BCE_ACC_IOU_divide_1_sigmoid_256_train_matte.pb \
+  --graph=/media/new_hdd2/seg_net/results/Models/GraphModels/mobilenetv2_GUnet_MSE_ACC_IOU_divide_1_sigmoid_256_train_matte_op.pb \
   --input_layer="input_1:0" \
   --input_layer_shape="1,256,256,3" \
   --input_layer_type="float" \
