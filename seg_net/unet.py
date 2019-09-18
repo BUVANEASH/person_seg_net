@@ -195,9 +195,6 @@ def Unet(pretrained = None,
     
     if densenet_matting_layers:
         _model = keras.Model(img_input, x)
-        
-        for layer in _model.layers:
-            layer.trainable = False
             
         x = _model.output
         densenet_matte_skip = img_input
@@ -210,7 +207,7 @@ def Unet(pretrained = None,
 	        x = keras.layers.Activation(activation, name=activation)(x)
             
         model = keras.Model(img_input, x)
-	        
+        	        
     else:
 	    if activation in {'softmax','sigmoid'}:
 	        x = keras.layers.Activation(activation, name=activation)(x)
