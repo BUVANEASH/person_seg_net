@@ -139,7 +139,7 @@ def Unet(pretrained = None,
     else:
         img_input = input_tensor
         
-    assert n_upsample_blocks == len(decoder_filters)
+    # assert n_upsample_blocks == len(decoder_filters)
     
     if backbone == 'mobilenetv2':
 	    encoder = MobileNetV2(input_shape=None,
