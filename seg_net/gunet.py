@@ -41,13 +41,13 @@ def SepConv_BN(filters, prefix, stride=1, kernel_size=3, rate=1, use_batchnorm=T
         if not depth_activation:
             x = keras.layers.Activation('relu')(x)
         x = keras.layers.DepthwiseConv2D((kernel_size, kernel_size), strides=(stride, stride), dilation_rate=(rate, rate),
-                            padding=depth_padding, use_bias=False, name=prefix + '_depthwise')(x)
+                                        padding=depth_padding, use_bias=False, name=prefix + '_depthwise')(x)
         if use_batchnorm:
             x = keras.layers.BatchNormalization(name=prefix + '_depthwise_BN', epsilon=epsilon)(x)
         if depth_activation:
             x = keras.layers.Activation('relu')(x)
         x = keras.layers.Conv2D(filters, (1, 1), padding='same',
-                   use_bias=False, name=prefix + '_pointwise')(x)
+                                use_bias=False, name=prefix + '_pointwise')(x)
         if use_batchnorm:
             x = keras.layers.BatchNormalization(name=prefix + '_pointwise_BN', epsilon=epsilon)(x)
         if depth_activation:
@@ -66,7 +66,7 @@ def ConvRelu(filters, kernel_size = 3, stride = 1, use_batchnorm=False, conv_nam
         return x
     return layer
 
-def densenet_matte(filters, classes, kernel_size = 3, stride = 1, use_batchnorm=False, sep_conv = True, n_layers = 3):
+def densenet_matte(filters, classes, kernel_size = 3, stride = 1, use_batchnorm=False, sep_conv = True, n_layers = 3 , dropout_rate = 0.3):
     
     def layer(input_tensor):
         x = input_tensor
@@ -78,6 +78,9 @@ def densenet_matte(filters, classes, kernel_size = 3, stride = 1, use_batchnorm=
             else:
                 x = SepConv_BN(filters, 'densenet_matt{}'.format(i), stride=stride, kernel_size=kernel_size, rate=1,
                            use_batchnorm=use_batchnorm, depth_activation=True, epsilon=1e-3)(x)
+
+            if dropout_rate:
+                x = keras.layers.Dropout(dropout_rate)(x)
         
         return x
     
@@ -132,7 +135,8 @@ def Unet(pretrained = None,
          densenet_matting_layers = 3,
          sep_conv = False,
          matt_sep_conv = False,
-         freeze_encoder = False):
+         freeze_encoder = False,
+         dropout_rate = 0.3):
     
     if input_tensor is None:
         img_input = keras.layers.Input(shape=input_shape)
@@ -176,16 +180,22 @@ def Unet(pretrained = None,
     
             x = Upsample2D_Block(decoder_filters[i], i, upsample=upsample,
                                  skip=skip_connection, use_batchnorm=True, sep_conv = sep_conv)(x)
+
+            if dropout_rate:
+                x = keras.layers.Dropout(dropout_rate)(x)
     
     if densenet_matting_layers:
         x = densenet_matte(densenet_matting_filters, classes = classes, kernel_size = 3, stride = 1, 
                            use_batchnorm=True, sep_conv = matt_sep_conv, 
-                           n_layers = densenet_matting_layers)(x)
+                           n_layers = densenet_matting_layers, dropout_rate = dropout_rate)(x)
                            
     if not sep_conv:
         x = keras.layers.Conv2D(classes, (3,3), padding='same', name='final_conv')(x)
     else:
         x = keras.layers.SeparableConv2D(classes, (3,3), padding='same', name='final_conv')(x)
+
+    if dropout_rate:
+        x = keras.layers.Dropout(dropout_rate)(x)
             
     if activation in {'softmax','sigmoid'}:
         x = keras.layers.Activation(activation, name=activation)(x)
