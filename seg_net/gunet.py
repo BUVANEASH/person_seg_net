@@ -59,7 +59,8 @@ def SepConv_BN(filters, prefix, stride=1, kernel_size=3, rate=1, use_batchnorm=T
 
 def ConvRelu(filters, kernel_size = 3, stride = 1, use_batchnorm=False, conv_name='conv', bn_name='bn', relu_name='relu'):
     def layer(x):
-        x = keras.layers.Conv2D(filters, (kernel_size,kernel_size), strides = (stride,stride), padding="same", name=conv_name, use_bias=not(use_batchnorm))(x)
+        x = keras.layers.Conv2D(filters, (kernel_size,kernel_size), strides = (stride,stride), 
+                                padding="same", name=conv_name, use_bias=not(use_batchnorm))(x)
         if use_batchnorm:
             x = keras.layers.BatchNormalization(name=bn_name)(x)
         x = keras.layers.Activation('relu', name=relu_name)(x)

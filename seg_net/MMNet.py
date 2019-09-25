@@ -10,7 +10,7 @@ import keras.backend as K
 
 def alpha_loss(y_true,y_pred):
     return K.mean(K.abs(y_pred - y_true))
-
+ 
 def comp_loss(y_true,y_pred,images):
     reconst_fg = K.tf.multiply(images, y_pred)
     true_fg = K.tf.multiply(images, y_true)
@@ -37,7 +37,7 @@ def kl_loss(y_true,y_pred):
 
 def custom_loss(input_layer, aux_layer):
     def loss(y_true,y_pred):
-        return alpha_loss(y_true,y_pred) + comp_loss(y_true,y_pred,input_layer) + kl_loss(y_true,y_pred) + kl_loss(aux_layer,y_pred) + grad_loss(y_true,y_pred)
+        return alpha_loss(y_true,y_pred) + comp_loss(y_true,y_pred,input_layer) + grad_loss(y_true,y_pred) + kl_loss(y_true,y_pred) + kl_loss(y_true,aux_layer)
     return loss
 
 def multiply_depth(depth, depth_multiplier, min_depth=8, divisor=8):
@@ -97,15 +97,8 @@ def ConvRelu(filters, kernel_size = 3, stride = 1, use_batchnorm=False, use_relu
             x = keras.layers.ReLU(max_value=6.0 if relu6 else None, name= prefix+'_pointwise_Relu'+('6' if relu6 else ''))(x)
         return x
     return layer
-'''
-inputs = endpoints["init_block"]
-expanded_depth = 16
-output_depth=16
-depth_multiplier=1.0
-rates = [1, 2, 4, 8]
-stride=2
-name="enc_block0"
-'''
+
+
 def encoder_block(inputs, expanded_depth, output_depth, depth_multiplier, rates, stride, name):
     
     expanded_depth = multiply_depth(expanded_depth, depth_multiplier)
@@ -132,7 +125,7 @@ def encoder_block(inputs, expanded_depth, output_depth, depth_multiplier, rates,
     x = ConvRelu(output_depth, kernel_size = 1, stride = 1, 
                  use_batchnorm=True, use_relu = False, relu6 = False, prefix=name+"_merge", padding="same")(x)
     
-    x = keras.layers.Dropout(0.3)(x)
+#    x = keras.layers.Dropout(0.3)(x)
     
     return x
 
@@ -164,24 +157,16 @@ def decoder_block(inputs, shortcut_input, compressed_depth, shortcut_depth, dept
 def init_block(inputs, depth, depth_multiplier, name):
     depth = multiply_depth(depth, depth_multiplier)
     x = ConvRelu(depth, kernel_size = 3, stride = 2, 
-                 use_batchnorm=True, use_relu = True, relu6 = True, prefix=name, padding="same")(inputs)
+                 use_batchnorm=False, use_relu = True, relu6 = True, prefix=name, padding="same")(inputs)
     return x
 
 def final_block(inputs, num_outputs, name):
     x = ConvRelu(num_outputs, kernel_size = 1, stride = 1, 
-                 use_batchnorm=True, use_relu = True, relu6 = True, prefix=name, padding="same")(inputs)
+                 use_batchnorm=False, use_relu = True, relu6 = True, prefix=name, padding="same")(inputs)
     return x
 
-'''
-pretrained = None,
-input_shape = (256,256,3)
-input_tensor=None
-depth_multiplier = 1.0
-classes = 1
-activation = 'sigmoid'
-'''
 def MMNet(pretrained = None,
-          input_shape = (128,128,3),
+          input_shape = (256,256,3),
           input_tensor=None,
           depth_multiplier = 1.0,
           classes = 1,
@@ -228,30 +213,4 @@ def MMNet(pretrained = None,
     if pretrained:
         mmnet.load_weights(pretrained, by_name=True)
     
-    return mmnet, endpoints
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    return mmnet, endpoints 
