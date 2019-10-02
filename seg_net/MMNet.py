@@ -7,6 +7,10 @@ Created on Mon Sep 23 18:28:25 2019
 """
 import keras
 import keras.backend as K
+import sys
+sys.path.append("..")
+import segmentation_models as sm
+from seg_net.mobilenet_v2 import MobileNetV2
 
 def alpha_loss(y_true,y_pred):
     return K.mean(K.abs(y_pred - y_true))
@@ -14,7 +18,7 @@ def alpha_loss(y_true,y_pred):
 def comp_loss(y_true,y_pred,images):
     reconst_fg = K.tf.multiply(images, y_pred)
     true_fg = K.tf.multiply(images, y_true)
-    return K.tf.losses.absolute_difference(reconst_fg, true_fg)
+    return K.mean(K.abs(reconst_fg-true_fg))
 
 def grad_loss(y_true,y_pred):
     filter_x = K.tf.constant([[-1/8, 0, 1/8],
@@ -30,14 +34,34 @@ def grad_loss(y_true,y_pred):
     grad_alpha = K.tf.nn.conv2d(y_pred, filter_xy, strides=[1, 1, 1, 1], padding="SAME")
     grad_masks = K.tf.nn.conv2d(y_true, filter_xy, strides=[1, 1, 1, 1], padding="SAME")
 
-    return K.tf.losses.absolute_difference(grad_alpha, grad_masks)
+    return K.mean(K.abs(grad_alpha - grad_masks))
 
-def kl_loss(y_true,y_pred):
-    return keras.losses.kullback_leibler_divergence(y_true,y_pred)
+def kld_loss(labels,logits):
+    loss = K.tf.nn.softmax_cross_entropy_with_logits_v2(
+        logits=logits,
+        labels=K.tf.stop_gradient(labels),
+    )
+    cost = K.tf.reduce_mean(loss)
+    return cost
+    #y_true = K.clip(y_true, K.epsilon(), 1)
+    #y_pred = K.clip(y_pred, K.epsilon(), 1)
+    #return K.sum(y_true * K.log(y_true / y_pred), axis=-1)
+    #return keras.losses.kullback_leibler_divergence(y_true,y_pred)
 
-def custom_loss(input_layer, aux_layer):
+def custom_loss(input_layer, logits_layer, aux_layer, num_class):
+    _,w,h,_ = K.int_shape(aux_layer)
     def loss(y_true,y_pred):
-        return alpha_loss(y_true,y_pred) + comp_loss(y_true,y_pred,input_layer) + grad_loss(y_true,y_pred) + kl_loss(y_true,y_pred) + kl_loss(y_true,aux_layer)
+        
+        logits = K.tf.reshape(logits_layer, [-1,1])
+        labels = K.tf.reshape(y_true, [-1,1])
+        down_y_true = keras.layers.Lambda(lambda x: K.tf.image.resize_images(x, (w,h)))(y_true)
+        down_labels = K.tf.reshape(down_y_true, [-1,1])
+        aux_logits = K.tf.reshape(aux_layer, [-1,1])
+        if num_class > 1:
+            y_true = K.tf.expand_dims(y_true[...,-1],axis=-1)
+            y_pred = K.tf.expand_dims(y_pred[...,-1],axis=-1)
+            
+        return alpha_loss(y_true,y_pred) + comp_loss(y_true,y_pred,input_layer) + grad_loss(y_true,y_pred) + kld_loss(labels,logits) + kld_loss(down_labels,aux_logits)
     return loss
 
 def multiply_depth(depth, depth_multiplier, min_depth=8, divisor=8):
@@ -165,34 +189,87 @@ def final_block(inputs, num_outputs, name):
                  use_batchnorm=False, use_relu = True, relu6 = True, prefix=name, padding="same")(inputs)
     return x
 
+'''
+pretrained = None,
+backbone = 'mobilenetv2'
+weights='imagenet'
+include_top=False
+alpha=1.0
+pooling=None
+input_shape = (256,256,3)
+input_tensor=None
+depth_multiplier = 1.0
+classes = 1
+activation = 'sigmoid'
+freeze_encoder = False
+'''
+
 def MMNet(pretrained = None,
+          backbone = 'mobilenetv2',
+          weights='imagenet',
+          include_top=False,
+          alpha=1.0,
+          pooling=None,
           input_shape = (256,256,3),
           input_tensor=None,
           depth_multiplier = 1.0,
           classes = 1,
-          activation = 'sigmoid'):
+          activation = 'sigmoid',
+          freeze_encoder = False):
+          
+    endpoints = {}
     
     if input_tensor is None:
         img_input = keras.layers.Input(shape=input_shape)
     else:
         img_input = input_tensor
         
-    endpoints = {}
-        
-    endpoints["init_block"] = init_block(img_input, 32, depth_multiplier, "init_block")
+    # assert n_upsample_blocks == len(decoder_filters)
     
-    endpoints["enc_block1"] = encoder_block(endpoints["init_block"], 16, 16, depth_multiplier, [1, 2, 4, 8], 2, "enc_block1")
-    endpoints["enc_block2"] = encoder_block(endpoints["enc_block1"], 16, 24, depth_multiplier, [1, 2, 4, 8], 1, "enc_block2")
-    endpoints["enc_block3"] = encoder_block(endpoints["enc_block2"], 24, 24, depth_multiplier, [1, 2, 4, 8], 1, "enc_block3")
-    endpoints["enc_block4"] = encoder_block(endpoints["enc_block3"], 24, 24, depth_multiplier, [1, 2, 4, 8], 1, "enc_block4")
-    endpoints["enc_block5"] = encoder_block(endpoints["enc_block4"], 32, 40, depth_multiplier, [1, 2, 4], 2, "enc_block5")
-    endpoints["enc_block6"] = encoder_block(endpoints["enc_block5"], 64, 40, depth_multiplier, [1, 2, 4], 1, "enc_block6")
-    endpoints["enc_block7"] = encoder_block(endpoints["enc_block6"], 64, 40, depth_multiplier, [1, 2, 4], 1, "enc_block7")
-    endpoints["enc_block8"] = encoder_block(endpoints["enc_block7"], 64, 40, depth_multiplier, [1, 2, 4], 1, "enc_block8")
-    endpoints["enc_block9"] = encoder_block(endpoints["enc_block8"], 80, 80, depth_multiplier, [1, 2], 2, "enc_block9")
-    endpoints["enc_block10"] = encoder_block(endpoints["enc_block9"], 120, 80, depth_multiplier, [1, 2], 1, "enc_block10")
+    if backbone == 'mobilenetv2':
+        encoder = MobileNetV2(input_shape=None,
+                               alpha=alpha,
+                               include_top=False,
+                               weights='imagenet',
+                               input_tensor=img_input,
+                               pooling=pooling)
+        
+        encoder_features = sm.backbones.get_feature_layers(backbone, n=4)
+        
+        skip_connection_idx = [-1] + ([sm.utils.get_layer_number(encoder, l) if isinstance(l, str) else l
+                                                                        for l in encoder_features])
+        
+        if freeze_encoder:
+            for layer in encoder.layers:
+                if not isinstance(layer, keras.layers.BatchNormalization):
+                    layer.trainable = False
+        
+        endpoints["enc_block5"] = encoder.layers[skip_connection_idx[2]].output
+        endpoints["enc_block1"] = encoder.layers[skip_connection_idx[3]].output
+        endpoints["enc_block10"] = encoder.layers[skip_connection_idx[0]].output
+        
+    else:        
+        endpoints["init_block"] = init_block(img_input, 32, depth_multiplier, "init_block")
+        
+        endpoints["enc_block1"] = encoder_block(endpoints["init_block"], 16, 16, depth_multiplier, [1, 2, 4, 8], 2, "enc_block1")
+        endpoints["enc_block2"] = encoder_block(endpoints["enc_block1"], 16, 24, depth_multiplier, [1, 2, 4, 8], 1, "enc_block2")
+        endpoints["enc_block3"] = encoder_block(endpoints["enc_block2"], 24, 24, depth_multiplier, [1, 2, 4, 8], 1, "enc_block3")
+        endpoints["enc_block4"] = encoder_block(endpoints["enc_block3"], 24, 24, depth_multiplier, [1, 2, 4, 8], 1, "enc_block4")
+        endpoints["enc_block5"] = encoder_block(endpoints["enc_block4"], 32, 40, depth_multiplier, [1, 2, 4], 2, "enc_block5")
+        endpoints["enc_block6"] = encoder_block(endpoints["enc_block5"], 64, 40, depth_multiplier, [1, 2, 4], 1, "enc_block6")
+        endpoints["enc_block7"] = encoder_block(endpoints["enc_block6"], 64, 40, depth_multiplier, [1, 2, 4], 1, "enc_block7")
+        endpoints["enc_block8"] = encoder_block(endpoints["enc_block7"], 64, 40, depth_multiplier, [1, 2, 4], 1, "enc_block8")
+        endpoints["enc_block9"] = encoder_block(endpoints["enc_block8"], 80, 80, depth_multiplier, [1, 2], 2, "enc_block9")
+        endpoints["enc_block10"] = encoder_block(endpoints["enc_block9"], 120, 80, depth_multiplier, [1, 2], 1, "enc_block10")
+        
+        encoder = keras.Model(inputs = img_input , outputs = endpoints["enc_block10"], name = 'Encoder')
+        
+        if freeze_encoder:
+            for layer in encoder.layers:
+                if not isinstance(layer, keras.layers.BatchNormalization):
+                    layer.trainable = False
 
-    endpoints["dec_block1"] = decoder_block(endpoints["enc_block10"], endpoints["enc_block5"], 64, 64, depth_multiplier, 1, "dec_block0")
+    endpoints["dec_block1"] = decoder_block(endpoints["enc_block10"], endpoints["enc_block5"], 64, 64, depth_multiplier, 1 if backbone != 'mobilenetv2' else 2, "dec_block0")
     endpoints["dec_block2"] = decoder_block(endpoints["dec_block1"], endpoints["enc_block1"], 40, 40, depth_multiplier, 1, "dec_block1")
 
     endpoints["enhancement_block1"] = encoder_block(endpoints["dec_block2"], 40, 40, depth_multiplier, [1, 2, 4], 1, "enhancement_block1")
@@ -205,12 +282,12 @@ def MMNet(pretrained = None,
     endpoints["classifier"] = keras.layers.Activation(activation)(endpoints["final_block"])
 
     # aux output
-    endpoints["aux_block0"] = final_block(endpoints["enc_block10"], num_outputs=classes, name="aux_block0")
-    endpoints["aux_block"] = keras.layers.Lambda(lambda x: K.tf.image.resize_images(x, input_shape[:2]))(endpoints["aux_block0"])
+    endpoints["aux_block"] = final_block(endpoints["enc_block10"], num_outputs=classes, name="aux_block")
+#    endpoints["aux_block"] = keras.layers.Lambda(lambda x: K.tf.image.resize_images(x, input_shape[:2]))(endpoints["aux_block0"])
     
     mmnet = keras.Model(inputs = img_input , outputs = endpoints["classifier"], name = 'MMNet')
     
     if pretrained:
-        mmnet.load_weights(pretrained, by_name=True)
+        mmnet.load_weights(pretrained, by_name = True, skip_mismatch = True)
     
     return mmnet, endpoints 

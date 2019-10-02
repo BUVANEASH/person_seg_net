@@ -166,8 +166,8 @@ def fast_scnn(pretrained = None,
         Keras Model of fast_scnn.
     '''
 
-    if backbone in {'mobilenetv2'}:
-        assert input_shape[0] == input_shape[1]
+#    if backbone in {'mobilenetv2'}:
+#        assert input_shape[0] == input_shape[1]
 #        assert input_shape[0]%48 == 0 and input_shape[1]%48 == 0
         
     if input_tensor is None:
