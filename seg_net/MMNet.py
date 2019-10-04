@@ -186,7 +186,7 @@ def init_block(inputs, depth, depth_multiplier, name):
 
 def final_block(inputs, num_outputs, name):
     x = ConvRelu(num_outputs, kernel_size = 1, stride = 1, 
-                 use_batchnorm=False, use_relu = True, relu6 = True, prefix=name, padding="same")(inputs)
+                 use_batchnorm=False, use_relu = False, relu6 = False, prefix=name, padding="same")(inputs)
     return x
 
 '''
@@ -246,7 +246,7 @@ def MMNet(pretrained = None,
         
         endpoints["enc_block5"] = encoder.layers[skip_connection_idx[2]].output
         endpoints["enc_block1"] = encoder.layers[skip_connection_idx[3]].output
-        endpoints["enc_block10"] = encoder.layers[skip_connection_idx[0]].output
+        endpoints["enc_block10"] = encoder.layers[skip_connection_idx[1]].output
         
     else:        
         endpoints["init_block"] = init_block(img_input, 32, depth_multiplier, "init_block")
@@ -269,7 +269,7 @@ def MMNet(pretrained = None,
                 if not isinstance(layer, keras.layers.BatchNormalization):
                     layer.trainable = False
 
-    endpoints["dec_block1"] = decoder_block(endpoints["enc_block10"], endpoints["enc_block5"], 64, 64, depth_multiplier, 1 if backbone != 'mobilenetv2' else 2, "dec_block0")
+    endpoints["dec_block1"] = decoder_block(endpoints["enc_block10"], endpoints["enc_block5"], 64, 64, depth_multiplier, 1, "dec_block0")
     endpoints["dec_block2"] = decoder_block(endpoints["dec_block1"], endpoints["enc_block1"], 40, 40, depth_multiplier, 1, "dec_block1")
 
     endpoints["enhancement_block1"] = encoder_block(endpoints["dec_block2"], 40, 40, depth_multiplier, [1, 2, 4], 1, "enhancement_block1")
